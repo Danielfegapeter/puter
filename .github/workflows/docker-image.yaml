@@ -5,10 +5,9 @@ name: Docker Image CI
 # branch called `main`.
 on:
   push:
-    tags:
-      - '*.*.*'
     branches:
-      - 'main'
+      - main
+  workflow_dispatch:  # Add this line to enable manual triggering
 
 # Defines two custom environment variables for the workflow. These are used
 # for the Container registry domain, and a name for the Docker image that
