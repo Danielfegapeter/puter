@@ -181,9 +181,10 @@ class Valid {
  * Makes the hybrid promise/callback function for a particular driver method
  * @param {string[]} arg_defs - argument names (for now; definitions eventually)
  * @param {string} driverInterface - name of the interface
+ * @param {string} driverName - name of the driver
  * @param {string} driverMethod - name of the method
  */
-function make_driver_method(arg_defs, driverInterface, driverMethod, settings = {}) {
+function make_driver_method(arg_defs, driverInterface, driverName, driverMethod, settings = {}) {
     return async function (...args) {
         let driverArgs = {};
         let options = {};
@@ -214,11 +215,11 @@ function make_driver_method(arg_defs, driverInterface, driverMethod, settings = 
             driverArgs = settings.preprocess(driverArgs);
         }
 
-        return await driverCall(options, driverInterface, driverMethod, driverArgs, settings);
+        return await driverCall(options, driverInterface, driverName, driverMethod, driverArgs, settings);
     };
 }
 
-async function driverCall (options, driverInterface, driverMethod, driverArgs, settings) {
+async function driverCall (options, driverInterface, driverName, driverMethod, driverArgs, settings) {
     const tp = new TeePromise();
 
     driverCall_(
@@ -226,6 +227,7 @@ async function driverCall (options, driverInterface, driverMethod, driverArgs, s
         tp.resolve.bind(tp),
         tp.reject.bind(tp),
         driverInterface,
+        driverName,
         driverMethod,
         driverArgs,
         undefined,
@@ -240,7 +242,7 @@ async function driverCall (options, driverInterface, driverMethod, driverArgs, s
 async function driverCall_(
     options = {},
     resolve_func, reject_func,
-    driverInterface, driverMethod, driverArgs,
+    driverInterface, driverName, driverMethod, driverArgs,
     method,
     contentType = 'application/json;charset=UTF-8',
     settings = {},
@@ -266,9 +268,73 @@ async function driverCall_(
     if ( settings.responseType ) {
         xhr.responseType = settings.responseType;
     }
+    
+    // ===============================================
+    // TO UNDERSTAND THIS CODE, YOU MUST FIRST
+    // UNDERSTAND THE FOLLOWING TEXT:
+    //
+    // Everything between here and the comment reading
+    // "=== END OF STREAMING ===" is ONLY for handling
+    // requests with content type "application/x-ndjson"
+    // ===============================================
+    
+    let is_stream = false;
+    let signal_stream_update = null;
+    let lastLength = 0;
+    let response_complete = false;
+    const parts_received = [];
+    xhr.onreadystatechange = () => {
+        if ( xhr.readyState === 2 ) {
+            if ( xhr.getResponseHeader("Content-Type") !==
+                'application/x-ndjson'
+            ) return;
+            is_stream = true;
+            const Stream = async function* Stream () {
+                while ( ! response_complete ) {
+                    const tp = new TeePromise();
+                    signal_stream_update = tp.resolve.bind(tp);
+                    await tp;
+                    if ( response_complete ) break;
+                    while ( parts_received.length > 0 ) {
+                        const value = parts_received.pop();
+                        const parts = value.split('\n');
+                        for ( const part of parts ) {
+                            if ( part.trim() === '' ) continue;
+                            yield JSON.parse(part);
+                        }
+                    }
+                }
+            }
+        
+            return resolve_func(Stream());
+        }
+        if ( xhr.readyState === 4 ) {
+            response_complete = true;
+            if ( is_stream ) {
+                signal_stream_update?.();
+            }
+        }
+    };
+
+    xhr.onprogress = function() {
+        if ( ! signal_stream_update ) return;
+
+        const newText = xhr.responseText.slice(lastLength);
+        lastLength = xhr.responseText.length; // Update lastLength to the current length
+        
+        parts_received.push(newText);
+        signal_stream_update();
+    };
+    
+    // ========================
+    // === END OF STREAMING ===
+    // ========================
 
     // load: success or error
     xhr.addEventListener('load', async function(response){
+        if ( is_stream ) {
+            return;
+        }
         const resp = await parseResponse(response.target);
         // HTTP Error - unauthorized
         if(response.status === 401 || resp?.code === "token_auth_failed"){
@@ -342,6 +408,7 @@ async function driverCall_(
     // send request
     xhr.send(JSON.stringify({
         interface: driverInterface,
+        driver: driverName,
         test_mode: settings?.test_mode, 
         method: driverMethod,
         args: driverArgs,

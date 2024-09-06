@@ -29,9 +29,10 @@ import download from './helpers/download.js';
 import path from "./lib/path.js";
 import UIContextMenu from './UI/UIContextMenu.js';
 import update_mouse_position from './helpers/update_mouse_position.js';
-import launch_app from './helpers/launch_app.js';
 import item_icon from './helpers/item_icon.js';
+import { PROCESS_IPC_ATTACHED } from './definitions.js';
 
+window.ipc_handlers = {};
 /**
  * In Puter, apps are loaded in iframes and communicate with the graphical user interface (GUI), and each other, using the postMessage API.
  * The following sets up an Inter-Process Messaging System between apps and the GUI that enables communication
@@ -88,31 +89,66 @@ window.addEventListener('message', async (event) => {
     const msg_id = event.data.uuid;
     const app_name = $(target_iframe).attr('data-app');
     const app_uuid = $el_parent_window.attr('data-app_uuid');
+    
+    // New IPC handlers should be registered here.
+    // Do this by calling `register_ipc_handler` of IPCService.
+    if ( window.ipc_handlers.hasOwnProperty(event.data.msg) ) {
+        const services = globalThis.services;
+        const svc_process = services.get('process');
+
+        // Add version info to old puter.js messages
+        // (and coerce them into the format of new ones)
+        if ( event.data.$ === undefined ) {
+            event.data.$ = 'puter-ipc';
+            event.data.v = 1;
+            event.data.parameters = {...event.data};
+            delete event.data.parameters.msg;
+            delete event.data.parameters.appInstanceId;
+            delete event.data.parameters.env;
+            delete event.data.parameters.uuid;
+        }
+        
+        // The IPC context contains information about the call
+        const iframe = window.iframe_for_app_instance(
+            event.data.appInstanceID);
+        const process = svc_process.get_by_uuid(event.data.appInstanceID);
+        const ipc_context = {
+            caller: {
+                process: process,
+                app: {
+                    appInstanceID: event.data.appInstanceID,
+                    iframe,
+                    window: $el_parent_window,
+                },
+            },
+        };
+        
+        // Registered IPC handlers are an object with a `handle()`
+        // method. We call it "spec" here, meaning specification.
+        const spec = window.ipc_handlers[event.data.msg];
+        let retval = await spec.handler(
+            event.data.parameters, { msg_id, ipc_context });
+            
+        puter.util.rpc.send(iframe.contentWindow, msg_id, retval);
+        
+        return;
+    }
 
     // todo validate all event.data stuff coming from the client (e.g. event.data.message, .msg, ...)
     //-------------------------------------------------
     // READY
     //-------------------------------------------------
     if(event.data.msg === 'READY'){
-        $(target_iframe).attr('data-appUsesSDK', 'true');
+        const services = globalThis.services;
+        const svc_process = services.get('process');
+        const process = svc_process.get_by_uuid(event.data.appInstanceID);
 
-        // If we were waiting to launch this as a child app, report to the parent that it succeeded.
-        window.report_app_launched(event.data.appInstanceID, { uses_sdk: true });
-
-        // Send any saved broadcasts to the new app
-        globalThis.services.get('broadcast').sendSavedBroadcastsTo(event.data.appInstanceID);
-
-        // If `window-active` is set (meanign the window is focused), focus the window one more time
-        // this is to ensure that the iframe is `definitely` focused and can receive keyboard events (e.g. keydown)
-        if($el_parent_window.hasClass('window-active')){
-            $el_parent_window.focusWindow();
-        }
-
+        process.ipc_status = PROCESS_IPC_ATTACHED;
     }
     //-------------------------------------------------
     // windowFocused
     //-------------------------------------------------
-    else if(event.data.msg === 'windowFocused'){
+    if(event.data.msg === 'windowFocused'){
         // TODO: Respond to this
     }
     //--------------------------------------------------------
@@ -844,25 +880,6 @@ window.addEventListener('message', async (event) => {
             window.watchItems[event.data.item_uid] = [];
 
         window.watchItems[event.data.item_uid].push(event.data.appInstanceID);
-    }
-    //--------------------------------------------------------
-    // launchApp
-    //--------------------------------------------------------
-    else if(event.data.msg === 'launchApp'){
-        // TODO: Determine if the app is allowed to launch child apps? We may want to limit this to prevent abuse.
-        // remember app for launch callback later
-        const child_instance_id = window.uuidv4();
-        window.child_launch_callbacks[child_instance_id] = {
-            parent_instance_id: event.data.appInstanceID,
-            launch_msg_id: msg_id,
-        };
-        // launch child app
-        launch_app({
-            name: event.data.app_name ?? app_name,
-            args: event.data.args ?? {},
-            parent_instance_id: event.data.appInstanceID,
-            uuid: child_instance_id,
-        });
     }
     //--------------------------------------------------------
     // readAppDataFile

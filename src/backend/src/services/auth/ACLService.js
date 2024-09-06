@@ -18,13 +18,19 @@
  */
 const APIError = require("../../api/APIError");
 const { NodePathSelector } = require("../../filesystem/node/selectors");
-const { get_user } = require("../../helpers");
 const { Context } = require("../../util/context");
 const BaseService = require("../BaseService");
 const { AppUnderUserActorType, UserActorType, Actor, SystemActorType, AccessTokenActorType } = require("./Actor");
 const { PermissionUtil } = require("./PermissionService");
 
 class ACLService extends BaseService {
+    async _init () {
+        const svc_featureFlag = this.services.get('feature-flag');
+        svc_featureFlag.register('public-folders', {
+            $: 'config-flag',
+            value: this.global_config.enable_public_folders ?? false,
+        });
+    }
     async check (actor, resource, mode) {
         const ld = (Context.get('logdent') ?? 0) + 1;
         return await Context.get().sub({ logdent: ld }).arun(async () => {
@@ -57,10 +63,23 @@ class ACLService extends BaseService {
         
         // Hard rule: anyone and anything can read /user/public directories
         if ( this.global_config.enable_public_folders ) {
-            const public_modes = ['read', 'list', 'see'];
-            if ( public_modes.includes(mode) ) {
-                if ( await fsNode.isPublic() ) return true;
-            }
+            const public_modes = Object.freeze(['read', 'list', 'see']);
+            let is_public;
+            await (async () => {
+                if ( ! public_modes.includes(mode) ) return;
+                if ( ! (await fsNode.isPublic()) ) return;
+                
+                const svc_getUser = this.services.get('get-user');
+                
+                const username = await fsNode.getUserPart();
+                const user = await svc_getUser.get_user({ username });
+                if ( ! (user.email_confirmed || user.username === 'admin') ) {
+                    return;
+                }
+                
+                is_public = true;
+            })();
+            if ( is_public ) return true;
         }
 
         // Access tokens only work if the authorizer has permission

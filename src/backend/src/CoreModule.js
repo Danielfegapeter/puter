@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-const { AdvancedBase } = require("@heyputer/puter-js-common");
+const { AdvancedBase } = require("@heyputer/putility");
 const Library = require("./definitions/Library");
 const { NotificationES } = require("./om/entitystorage/NotificationES");
 const { ProtectedAppES } = require("./om/entitystorage/ProtectedAppES");
@@ -317,6 +317,9 @@ const install = async ({ services, app, useapi }) => {
 
     const { FeatureFlagService } = require('./services/FeatureFlagService');
     services.registerService('feature-flag', FeatureFlagService);
+
+    const { KernelInfoService } = require('./services/KernelInfoService');
+    services.registerService('kernel-info', KernelInfoService);
 }
 
 const install_legacy = async ({ services }) => {

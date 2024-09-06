@@ -470,7 +470,8 @@ module.exports = class APIError {
         },
         'email_must_be_confirmed': {
             status: 422,
-            message: 'Email must be confirmed to apply a share.',
+            message: ({action}) =>
+                `Email must be confirmed to ${action ?? 'apply a share'}.`,
         },
         'no_need_to_request': {
             status: 422,
@@ -480,6 +481,10 @@ module.exports = class APIError {
         'can_not_apply_to_this_user': {
             status: 422,
             message: 'This share can not be applied to this user.',
+        },
+        'no_origin_for_app': {
+            status: 400,
+            message: 'Puter apps must have a valid URL.'
         },
 
         // Chat

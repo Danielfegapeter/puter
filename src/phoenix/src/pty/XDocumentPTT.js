@@ -21,7 +21,38 @@ import { BetterReader } from "dev-pty";
 const encoder = new TextEncoder();
 
 export class XDocumentPTT {
+    static IOCTL = {
+        TIOCGWINSZ: {
+            id: 104,
+        },
+    }
     constructor(terminalConnection) {
+        for ( const k in XDocumentPTT.IOCTL ) {
+            this[k] = async () => {
+                return await new Promise((resolve, reject) => {
+                    terminalConnection.postMessage({
+                        $: 'ioctl.request',
+                        requestCode: XDocumentPTT.IOCTL[k].id,
+                    });
+                    this.once('ioctl.set', evt => {
+                        resolve(evt);
+                    });
+                });
+            };
+        }
+
+        this.termios = new Proxy({}, {
+            set (target, k, v) {
+                terminalConnection.postMessage({
+                    $: 'chtermios',
+                    termios: {
+                        [k]: v,
+                    }
+                });
+                return Reflect.set(target, k, v);
+            }
+        });
+
         this.ioctl_listeners = {};
 
         this.readableStream = new ReadableStream({
@@ -71,5 +102,20 @@ export class XDocumentPTT {
         for ( const listener of this.ioctl_listeners[name] ) {
             listener(evt);
         }
+    }
+
+    once (name, listener) {
+        const wrapper = evt => {
+            listener(evt);
+            this.off(name, wrapper);
+        };
+        this.on(name, wrapper);
+    }
+
+    off (name, listener) {
+        if ( ! this.ioctl_listeners.hasOwnProperty(name) ) return;
+        this.ioctl_listeners[name] = this.ioctl_listeners[name].filter(
+            l => l !== listener
+        );
     }
 }

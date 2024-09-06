@@ -39,7 +39,8 @@
 // something like this was also done in backend and it proved useful.
 (scope => {
     globalThis.logger = {
-        info: (...a) => console.log('%c[INIT/INFO]', 'color: #4287f5', ...a),
+        info: (...a) => {},
+        // info: (...a) => console.log('%c[INIT/INFO]', 'color: #4287f5', ...a),
     };
 })(globalThis);
 logger.info('start -> blocking initialization');
@@ -111,8 +112,6 @@ logger.info('start -> blocking initialization');
 
         registry_.hooks_on_register.forEach(hook => hook({ cls }));
 
-        console.log('registered class', id, registry_);
-
         // Find class that owns 'on_self_registered' hook
         let owner = cls;
         while (
@@ -133,7 +132,6 @@ logger.info('start -> blocking initialization');
     };
 
     scope.use = id => {
-        console.log('use called with id: ', id);
         if ( id === undefined ) {
             return registry_.classes_m;
         }
@@ -141,13 +139,6 @@ logger.info('start -> blocking initialization');
         if ( !registry_.classes_m[id] ) {
             throw new Error(`Class with ID ${id} not registered`);
         }
-
-        console.log(
-            'okay it\'s going to return:',
-            registry_.classes_m[id],
-            'and the entire map is this: ',
-            registry_.classes_m
-        )
 
         return registry_.classes_m[id];
     }

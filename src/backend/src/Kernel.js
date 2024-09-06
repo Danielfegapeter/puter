@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-const { AdvancedBase } = require("@heyputer/puter-js-common");
+const { AdvancedBase } = require("@heyputer/putility");
 const { Context } = require('./util/context');
 const BaseService = require("./services/BaseService");
 const useapi = require('useapi');
@@ -136,6 +136,7 @@ class Kernel extends AdvancedBase {
 
         // Internal modules
         for ( const module of this.modules ) {
+            services.registerModule(module.constructor.name, module);
             await module.install(Context.get());
         }
 

@@ -40,7 +40,6 @@ const launch_app = async (options)=>{
     
     // explorer is a special case
     if(options.name === 'explorer'){
-        console.log('explorer');
         app_info = [];
     }
     else if(options.app_obj)
@@ -359,25 +358,16 @@ const launch_app = async (options)=>{
         }
     }
 
-    (async () => {
-        const el = await el_win;
-        $(el).on('remove', () => {
-            const svc_process = globalThis.services.get('process');
-            svc_process.unregister(process.uuid);
+    const el = await el_win;
+    process.references.el_win = el;
+    process.chstatus(PROCESS_RUNNING);
 
-            // If it's a non-sdk app, report that it launched and closed.
-            // FIXME: This is awkward. Really, we want some way of knowing when it's launched and reporting that immediately instead.
-            const $app_iframe = $(el).find('.window-app-iframe');
-            if ($app_iframe.attr('data-appUsesSdk') !== 'true') {
-                window.report_app_launched(process.uuid, { uses_sdk: false });
-                // We also have to report an extra close event because the real one was sent already
-                window.report_app_closed(process.uuid);
-            }
-        });
+    $(el).on('remove', () => {
+        const svc_process = globalThis.services.get('process');
+        svc_process.unregister(process.uuid);
+    });
 
-        process.references.el_win = el;
-        process.chstatus(PROCESS_RUNNING);
-    })();
+    return process;
 }
 
 export default launch_app;

@@ -20,10 +20,12 @@ import { encode } from 'html-entities';
 import fs from 'fs';
 import path from 'path';
 import webpack from 'webpack';
+import webpack_config from './webpack.config.cjs';
 import CleanCSS from 'clean-css';
 import uglifyjs from 'uglify-js';
 import { lib_paths, css_paths, js_paths } from './src/static-assets.js';
 import { fileURLToPath } from 'url';
+import BaseConfig from './webpack/BaseConfig.cjs';
 
 // Polyfill __dirname, which doesn't exist in modules mode
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -108,7 +110,7 @@ async function build(options){
         let fullpath = path.join(__dirname, 'src', css_paths[i]);
         // minify CSS files if not already minified, then concatenate
         if(css_paths[i].endsWith('.css') && !css_paths[i].endsWith('.min.css')){
-            const minified_css = new CleanCSS({}).minify(fs.readFileSync(fullpath).toString()); 
+            const minified_css = new CleanCSS({}).minify(fs.readFileSync(fullpath).toString());
             css += minified_css.styles;
         }
         // otherwise, just concatenate the file
@@ -127,44 +129,44 @@ async function build(options){
     for(let i = 0; i < js_paths.length; i++){
         main_array.push(path.join(__dirname, 'src', js_paths[i]));
     }
-    webpack({
+    const webpack_opts = {
+        ...(await BaseConfig({
+            ...options,
+            env: 'prod',
+        })),
         mode: 'production',
-        entry: {
-            main: main_array,
-        },
-            output: {
-            path: path.resolve(__dirname, 'dist'),
-            filename: '[name].js',
-        },
         optimization: {
             minimize: true,
         },
-    }, (err, stats) => {
+    }
+    console.log('webpack opts', webpack_opts);
+    await webpack(webpack_opts, (err, stats) => {
         if(err){
-            console.error(err);
-            return;
+            throw err;
+            // console.error(err);
+            // return;
         }
-        if(options?.verbose)
+        //if(options?.verbose)
             console.log(stats.toString());
         // write to ./dist/bundle.min.js
-        fs.writeFileSync(path.join(__dirname, 'dist', 'bundle.min.js'), icons + '\n\n\n' + js + '\n\n\n' + fs.readFileSync(path.join(__dirname, 'dist', 'main.js')));
+        // fs.writeFileSync(path.join(__dirname, 'dist', 'bundle.min.js'), fs.readFileSync(path.join(__dirname, 'dist', 'main.js')));
         // remove ./dist/main.js
-        fs.unlinkSync(path.join(__dirname, 'dist', 'main.js'));
+        // fs.unlinkSync(path.join(__dirname, 'dist', 'main.js'));
     });
 
     // Copy index.js to dist/gui.js
     // Prepend `window.gui_env="prod";` to `./dist/gui.js`
     fs.writeFileSync(
-        path.join(__dirname, 'dist', 'gui.js'), 
+        path.join(__dirname, 'dist', 'gui.js'),
         `window.gui_env="prod"; \n\n` + fs.readFileSync(path.join(__dirname, 'src', 'index.js'))
     );
 
     const copy_these = [
-        'images', 
+        'images',
         'fonts',
         'favicons',
-        'browserconfig.xml', 
-        'manifest.json', 
+        'browserconfig.xml',
+        'manifest.json',
         'favicon.ico',
         'security.txt',
     ];
@@ -193,7 +195,7 @@ async function build(options){
  * also includes the necessary CSS and JavaScript files, as well as the required meta tags for social
  * media sharing and search engine optimization. The function is designed to be used in development
  * environments to generate the HTML content for the GUI.
- * 
+ *
  * @param {Object} options - The configuration options for the GUI.
  * @param {string} options.env - The environment in which the GUI is running (e.g., "dev" or "prod").
  * @param {string} options.api_origin - The origin of the API server.
@@ -205,7 +207,7 @@ async function build(options){
  * @param {string} options.origin - The origin of the GUI.
  * @param {string} options.social_card - The URL of the social media card image.
  * @returns {string} The HTML content for the GUI based on the specified configuration options.
- * 
+ *
  */
 function generateDevHtml(options){
     let start_t = Date.now();
@@ -282,7 +284,7 @@ function generateDevHtml(options){
         // preload images when applicable
         h += `<link rel="preload" as="image" href="./images/wallpaper.webp">`;
     h += `</head>`;
-    
+
     h += `<body>`;
 
         // To indicate that the GUI is running to any 3rd-party scripts that may be running on the page
@@ -296,7 +298,7 @@ function generateDevHtml(options){
                 h += `<script src="${lib_paths[i]}"></script>`;
             }
         }
-        
+
         // load images and icons as base64 for performance
         if(options.env === 'dev'){
             h += `<script>`;
@@ -343,9 +345,9 @@ function generateDevHtml(options){
         </script>`;
 
     h += `</body>
-    
-    </html>`;  
-    
+
+    </html>`;
+
     console.log(`/index.js: ` + (Date.now() - start_t)/1000);
     return h;
 }

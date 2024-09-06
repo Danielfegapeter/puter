@@ -1,7 +1,10 @@
+const { PassThrough } = require('stream');
 const APIError = require('../../api/APIError');
 const BaseService = require('../../services/BaseService');
+const { TypedValue } = require('../../services/drivers/meta/Runtime');
 const { Context } = require('../../util/context');
 const SmolUtil = require('../../util/smolutil');
+const { nou } = require('../../util/langutil');
 
 class OpenAICompletionService extends BaseService {
     static MODULES = {
@@ -20,7 +23,13 @@ class OpenAICompletionService extends BaseService {
 
     static IMPLEMENTS = {
         ['puter-chat-completion']: {
-            async complete ({ messages, test_mode }) {
+            async list () {
+                return [
+                    'gpt-4o',
+                    'gpt-4o-mini',
+                ];
+            },
+            async complete ({ messages, test_mode, stream, model }) {
                 if ( test_mode ) {
                     const { LoremIpsum } = require('lorem-ipsum');
                     const li = new LoremIpsum({
@@ -46,10 +55,10 @@ class OpenAICompletionService extends BaseService {
                     }
                 }
 
-                const model = 'gpt-4o';
                 return await this.complete(messages, {
-                    model,
+                    model: model ?? 'gpt-4o',
                     moderation: true,
+                    stream,
                 });
             }
         }
@@ -76,14 +85,13 @@ class OpenAICompletionService extends BaseService {
         };
     }
 
-    async complete (messages, { moderation, model }) {
+    async complete (messages, { stream, moderation, model }) {
         // Validate messages
         if ( ! Array.isArray(messages) ) {
             throw new Error('`messages` must be an array');
         }
 
-        model = model ?? 'gpt-3.5-turbo';
-        // model = model ?? 'gpt-4o';
+        model = model ?? 'gpt-4o-mini';
 
         for ( let i = 0; i < messages.length; i++ ) {
             let msg = messages[i];
@@ -199,7 +207,36 @@ class OpenAICompletionService extends BaseService {
             messages: messages,
             model: model,
             max_tokens,
+            stream,
         });
+        
+        if ( stream ) {
+            const entire = [];
+            const stream = new PassThrough();
+            const retval = new TypedValue({
+                $: 'stream',
+                content_type: 'application/x-ndjson',
+                chunked: true,
+            }, stream);
+            (async () => {
+                for await ( const chunk of completion ) {
+                    entire.push(chunk);
+                    if ( chunk.choices.length < 1 ) continue;
+                    if ( chunk.choices[0].finish_reason ) {
+                        stream.end();
+                        break;
+                    }
+                    if ( nou(chunk.choices[0].delta.content) ) continue;
+                    const str = JSON.stringify({
+                        text: chunk.choices[0].delta.content
+                    });
+                    stream.write(str + '\n');
+                }
+                stream.end();
+            })();
+            return retval;
+        }
+
 
         this.log.info('how many choices?: ' + completion.choices.length);
 
@@ -244,7 +281,7 @@ class OpenAICompletionService extends BaseService {
                 throw new Error('message is not allowed');
             }
         }
-
+        
         return completion.choices[0];
     }
 }

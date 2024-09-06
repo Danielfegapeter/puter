@@ -28,13 +28,20 @@ class AIInterfaceService extends BaseService {
         col_interfaces.set('puter-chat-completion', {
             description: 'Chatbot.',
             methods: {
+                list: {
+                    description: 'List supported models',
+                    result: { type: 'json' },
+                    parameters: {},
+                },
                 complete: {
                     description: 'Get completions for a chat log.',
                     parameters: {
                         messages: { type: 'json' },
                         vision: { type: 'flag' },
+                        stream: { type: 'flag' },
+                        model: { type: 'string' },
                     },
-                    result: { type: 'json' }
+                    result: { type: 'json' },
                 }
             }
         });

@@ -73,7 +73,7 @@ module.exports = eggspress('/drivers/call', {
     const result = await context.arun(async () => {
         return await svc_driver.call({
             iface: interface_name,
-            driver: body.driver,
+            driver: body.driver ?? body.service,
             method: body.method,
             format: body.format,
             args: body.args,
@@ -84,7 +84,7 @@ module.exports = eggspress('/drivers/call', {
     // consider the case where a driver method implements a
     // stream transformation, thus the stream from the request isn't
     // consumed until the response is being sent.
-
+    
     _respond(res, result);
 
     // What we _can_ do is await the request promise while responding
@@ -95,8 +95,12 @@ module.exports = eggspress('/drivers/call', {
 const _respond = (res, result) => {
     if ( result.result instanceof TypedValue ) {
         const tv = result.result;
+        debugger;
         if ( TypeSpec.adapt({ $: 'stream' }).equals(tv.type) ) {
             res.set('Content-Type', tv.type.raw.content_type);
+            if ( tv.type.raw.chunked ) {
+                res.set('Transfer-Encoding', 'chunked');
+            }
             tv.value.pipe(res);
             return;
         }

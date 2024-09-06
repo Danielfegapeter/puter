@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-const { AdvancedBase } = require("@heyputer/puter-js-common");
+const { AdvancedBase } = require("@heyputer/putility");
 const BaseService = require("./BaseService");
 
 class MapCollection extends AdvancedBase {
@@ -49,7 +49,8 @@ class MapCollection extends AdvancedBase {
     }
     
     keys () {
-        return this.kv.keys(`registry:map:${this.map_id}:*`);
+        const keys = this.kv.keys(`registry:map:${this.map_id}:*`);
+        return keys.map(k => k.slice(`registry:map:${this.map_id}:`.length));
     }
 
     _mk_key (key) {

@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-const { AdvancedBase } = require("@heyputer/puter-js-common");
+const { AdvancedBase } = require("@heyputer/putility");
 const config = require("../../config");
 
 class SelfHostedModule extends AdvancedBase {
@@ -49,6 +49,12 @@ class SelfHostedModule extends AdvancedBase {
                     args: ['run', 'start-webpack'],
                 },
                 {
+                    name: 'gui:webpack-watch',
+                    directory: 'src/gui',
+                    command: 'npm',
+                    args: ['run', 'start-webpack'],
+                },
+                {
                     name: 'terminal:rollup-watch',
                     directory: 'src/terminal',
                     command: 'npx',
@@ -74,6 +80,12 @@ class SelfHostedModule extends AdvancedBase {
                     env: {
                         PUTER_JS_URL: ({ global_config: config }) => config.origin + '/sdk/puter.dev.js',
                     }
+                },
+                {
+                    name: 'emulator:webpack-watch',
+                    directory: 'src/emulator',
+                    command: 'npm',
+                    args: ['run', 'start-webpack'],
                 },
             ],
         });
@@ -101,6 +113,18 @@ class SelfHostedModule extends AdvancedBase {
                     prefix: '/builtin/dev-center',
                     path: path_.resolve(__dirname, RELATIVE_PATH, 'src/dev-center'),
                 },
+                {
+                    prefix: '/builtin/dev-center',
+                    path: path_.resolve(__dirname, RELATIVE_PATH, 'src/dev-center'),
+                },
+                {
+                    prefix: '/builtin/emulator',
+                    path: path_.resolve(__dirname, RELATIVE_PATH, 'src/emulator/dist'),
+                },
+                {
+                    prefix: '/vendor/v86',
+                    path: path_.resolve(__dirname, RELATIVE_PATH, 'submodules/v86/build'),
+                },
             ],
         });
         
@@ -110,6 +134,18 @@ class SelfHostedModule extends AdvancedBase {
                 RELATIVE_PATH,
                 'src/puter-js/dist/puter.dev.js'),
             route: '/puter.js/v2',
+        });
+        services.registerService('__serve-putilityjs-new', ServeSingleFileService, {
+            path: path_.resolve(__dirname,
+                RELATIVE_PATH,
+                'src/putility/dist/putility.dev.js'),
+            route: '/putility.js/v1',
+        });
+        services.registerService('__serve-gui-js', ServeSingleFileService, {
+            path: path_.resolve(__dirname,
+                RELATIVE_PATH,
+                'src/gui/dist/gui.dev.js'),
+            route: '/putility.js/v1',
         });
     }
 }

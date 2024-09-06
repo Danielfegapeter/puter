@@ -1,4 +1,4 @@
-const { AdvancedBase } = require("@heyputer/puter-js-common");
+const { AdvancedBase } = require("@heyputer/putility");
 const config = require("../../config");
 
 class PuterAIModule extends AdvancedBase {
@@ -27,6 +27,26 @@ class PuterAIModule extends AdvancedBase {
 
             const { OpenAIImageGenerationService } = require('./OpenAIImageGenerationService');
             services.registerService('openai-image-generation', OpenAIImageGenerationService);
+        }
+        
+        if ( !! config?.services?.claude ) {
+            const { ClaudeService } = require('./ClaudeService');
+            services.registerService('claude', ClaudeService);
+        }
+
+        if ( !! config?.services?.['together-ai'] ) {
+            const { TogetherAIService } = require('./TogetherAIService');
+            services.registerService('together-ai', TogetherAIService);
+        }
+        
+        if ( !! config?.services?.['mistral'] ) {
+            const { MistralAIService } = require('./MistralAIService');
+            services.registerService('mistral', MistralAIService);
+        }
+        
+        if ( !! config?.services?.['groq'] ) {
+            const { GroqAIService } = require('./GroqAIService');
+            services.registerService('groq', GroqAIService);
         }
     }
 }

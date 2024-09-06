@@ -47,7 +47,8 @@ const WHOAMI_GET = eggspress('/whoami', {
         uuid: req.user.uuid,
         email: req.user.email,
         unconfirmed_email: req.user.email,
-        email_confirmed: req.user.email_confirmed,
+        email_confirmed: req.user.email_confirmed
+            || req.user.username === 'admin',
         requires_email_confirmation: req.user.requires_email_confirmation,
         desktop_bg_url: req.user.desktop_bg_url,
         desktop_bg_color: req.user.desktop_bg_color,
@@ -61,7 +62,10 @@ const WHOAMI_GET = eggspress('/whoami', {
 
     // Get whoami values from other services
     const svc_whoami = req.services.get('whoami');
-    const provider_details = await svc_whoami.get_details({ user: req.user });
+    const provider_details = await svc_whoami.get_details({
+        user: req.user,
+        actor: actor,
+    });
     Object.assign(details, provider_details);
 
     if ( ! is_user ) {
@@ -69,6 +73,7 @@ const WHOAMI_GET = eggspress('/whoami', {
         // delete details.username;
         // delete details.uuid;
         delete details.email;
+        delete details.unconfirmed_email;
         delete details.desktop_bg_url;
         delete details.desktop_bg_color;
         delete details.desktop_bg_fit;
@@ -165,7 +170,8 @@ WHOAMI_POST.post('/whoami', auth, fs, express.json(), async (req, response, next
         username: req.user.username,
         uuid: req.user.uuid,
         email: req.user.email,
-        email_confirmed: req.user.email_confirmed,
+        email_confirmed: req.user.email_confirmed
+            || req.user.username === 'admin',
         requires_email_confirmation: req.user.requires_email_confirmation,
         desktop_bg_url: req.user.desktop_bg_url,
         desktop_bg_color: req.user.desktop_bg_color,
